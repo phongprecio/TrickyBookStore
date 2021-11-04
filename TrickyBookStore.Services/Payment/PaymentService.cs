@@ -14,6 +14,8 @@ namespace TrickyBookStore.Services.Payment
         IBookService BookService { get; }
         IPurchaseTransactionService PurchaseTransactionService { get; }
 
+        private static int LimitedDiscountBook = 3;
+
         public PaymentService(ICustomerService customerService, 
             IPurchaseTransactionService purchaseTransactionService,
             IBookService bookService)
@@ -23,57 +25,72 @@ namespace TrickyBookStore.Services.Payment
             BookService = bookService;
         }
 
-        public double GetPaymentAmount(long customerId, DateTimeOffset fromDate, DateTimeOffset toDate)
+        public double GetPaymentAmount(PaymentAmountSearchParameter searchParameter)
         {
-            var customer = CustomerService.GetCustomerById(customerId);
-            var purcharseTransactions = PurchaseTransactionService.GetPurchaseTransactions(customer.Id, fromDate, toDate);
+            var purcharseTransactions = PurchaseTransactionService.GetPurchaseTransactions(searchParameter);
 
-            return PaymentAmount(purcharseTransactions, customer);
+            return PaymentAmount(purcharseTransactions, searchParameter);
         }
 
-        private double PaymentAmount(IList<PurchaseTransaction> purcharseTransactions, Customer customer)
+        private double PaymentAmount(IList<PurchaseTransaction> purcharseTransactions, PaymentAmountSearchParameter searchParameter)
         {
             double amount = 0;
             var categoryAddictedIds = new List<int>();
+            var customer = CustomerService.GetCustomerById(searchParameter.CustomerId);
+
+            var totalMonth = searchParameter.ToDate.Month - searchParameter.FromDate.Month + 1;
+            amount += CalculatorSubscriptionOfMonth(customer, amount) * totalMonth;
+
+            var purcharseTransactionDics = purcharseTransactions
+                                                .GroupBy(transaction => transaction.CreatedDate.DateTime.Month)
+                                                .ToDictionary(transaction => transaction.Key, transaction => transaction.ToList());
+
             if (customer.SubscriptionIds.Any())
-            {
-                customer.Subscriptions.ToList().ForEach(subscription => amount += subscription.PriceDetails["FixPrice"]);
                 categoryAddictedIds = customer.Subscriptions
-                                        .Where(subscription => subscription.SubscriptionType == SubscriptionTypes.CategoryAddicted)
-                                        .Select(subscription => subscription.Id).ToList();
-            }
+                                            .Where(subscription => subscription.SubscriptionType == SubscriptionTypes.CategoryAddicted)
+                                            .Select(subscription => subscription.Id).ToList();
 
-            if (purcharseTransactions.Any())
+            foreach (var purcharseTransactionDic in purcharseTransactionDics)
             {
-                var books = purcharseTransactions.Select(transaction => transaction.Book).ToList();
-                var subscriptionTypes = customer.Subscriptions.Select(subscription => subscription.SubscriptionType).Distinct().ToList();
-
-                if (customer.SubscriptionIds.Any())
+                if (purcharseTransactions.Any())
                 {
-                    if (subscriptionTypes.Contains(SubscriptionTypes.CategoryAddicted))
-                        amount += CalculatorCategoryAddictedPrice(ref books, amount, categoryAddictedIds);
-                    if (subscriptionTypes.Contains(SubscriptionTypes.Premium))
-                        amount += CalculatorPremiumPrice(ref books, amount, categoryAddictedIds);
-                    if (subscriptionTypes.Contains(SubscriptionTypes.Paid))
-                        amount += CalculatorPaidPrice(ref books, amount);
-                    if (subscriptionTypes.Contains(SubscriptionTypes.Free))
-                        amount += CalculatorFreePrice(books, amount);
-                }
+                    var books = purcharseTransactionDic.Value.Select(transaction => transaction.Book).ToList();
+                    var subscriptionTypes = customer.Subscriptions.Select(subscription => subscription.SubscriptionType).Distinct().ToList();
 
-                books.ForEach(book => amount += book.Price);
+                    if (customer.SubscriptionIds.Any())
+                    {
+                        if (subscriptionTypes.Contains(SubscriptionTypes.CategoryAddicted))
+                            amount = CalculatorCategoryAddictedPrice(ref books, amount, categoryAddictedIds);
+                        if (subscriptionTypes.Contains(SubscriptionTypes.Premium))
+                            amount = CalculatorPremiumPrice(ref books, amount);
+                        if (subscriptionTypes.Contains(SubscriptionTypes.Paid))
+                            amount = CalculatorPaidPrice(ref books, amount);
+                        if (subscriptionTypes.Contains(SubscriptionTypes.Free))
+                            amount = CalculatorFreePrice(ref books, amount);
+                    }
+
+                    books.ForEach(book => amount += book.Price);
+                }
             }
+
 
             return amount;
         }
 
-        private double CalculatorPremiumPrice(ref List<Book> books, double amount, List<int> categoryAddictedIds)
+        private double CalculatorSubscriptionOfMonth(Customer customer, double amount)
+        {
+            customer.Subscriptions.ToList().ForEach(subscription => amount += subscription.PriceDetails["FixPrice"]);
+            return amount;
+        }
+
+        private double CalculatorPremiumPrice(ref List<Book> books, double amount)
         {
             var oldBookIds = books.Where(book => book.IsOld == true).Select(book => book.Id).ToList();
             var countedBookIds = new List<long>();
 
-            for (var i = 0; i < 3 && i < books.Count; i++)
+            for (var i = 0; i < LimitedDiscountBook && i < books.Count; i++)
             {
-                amount += books[i].Price * 0.15;
+                amount += books[i].Price * 0.85;
                 countedBookIds.Add(books[i].Id);
             }
 
@@ -92,9 +109,9 @@ namespace TrickyBookStore.Services.Payment
             categoryAddictedIds.ForEach(categoryId =>
             {
                 var discountBookByCategories = discountBooks.Where(book => book.CategoryId == categoryId).ToList();
-                for (var i = 0; i < 3 && i < discountBookByCategories.Count; i++)
+                for (var i = 0; i < LimitedDiscountBook && i < discountBookByCategories.Count; i++)
                 {
-                    amount += discountBookByCategories[i].Price * 0.15;
+                    amount += discountBookByCategories[i].Price * 0.85;
                     countedBookIds.Add(discountBookByCategories[i].Id);
                 }
             });
@@ -106,6 +123,7 @@ namespace TrickyBookStore.Services.Payment
         private double CalculatorPaidPrice(ref List<Book> books, double amount)
         {
             var oldBooks = books.Where(book => book.IsOld == true).ToList();
+            var discountBooks = books.Where(book => book.IsOld == false).ToList();
             var countedBookIds = new List<long>();
 
             oldBooks.ForEach(book =>
@@ -114,23 +132,25 @@ namespace TrickyBookStore.Services.Payment
                 countedBookIds.Add(book.Id);
             });
 
-            for (var i = 0; i < 3 && i < books.Count; i++)
+            for (var i = 0; i < LimitedDiscountBook && i < discountBooks.Count; i++)
             {
-                amount += books[i].Price * 0.95;
-                countedBookIds.Add(books[i].Id);
+                amount += discountBooks[i].Price * 0.95;
+                countedBookIds.Add(discountBooks[i].Id);
             }
             books = books.FindAll(book => !countedBookIds.Contains(book.Id));
 
             return amount;
         }
 
-        private double CalculatorFreePrice(List<Book> books, double amount)
+        private double CalculatorFreePrice(ref List<Book> books, double amount)
         {
             var oldBooks = books.FindAll(book => book.IsOld == true).ToList();
             var newBooks = books.FindAll(book => book.IsOld == false).ToList();
 
             oldBooks.ForEach(book => amount += book.Price * 0.9);
             newBooks.ForEach(book => amount += book.Price);
+
+            books = new List<Book>();
 
             return amount;
         }

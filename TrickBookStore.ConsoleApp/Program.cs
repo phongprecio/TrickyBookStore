@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TrickyBookStore.Models;
 using TrickyBookStore.Services.Books;
 using TrickyBookStore.Services.Customers;
 using TrickyBookStore.Services.Payment;
@@ -25,22 +26,10 @@ namespace TrickBookStore.ConsoleApp
                 .AddSingleton<ISubscriptionService, SubscriptionService>()
                 .BuildServiceProvider();
 
-            Console.WriteLine("Date Format: YYYY-MM-DD");
-
-            Console.WriteLine("Input Customer Id");
-            var customerIdString = Console.ReadLine();
-            var customerId = Convert.ToInt32(customerIdString);
-
-            Console.WriteLine("Input From Date");
-            var fromDateString = Console.ReadLine();
-            var fromDate = DateTime.Parse(fromDateString);
-
-            Console.WriteLine("Input To Date");
-            var toDateString = Console.ReadLine();
-            var toDate = DateTime.Parse(toDateString);
+            var searchParameter = GetSearchParameterParameter();
 
             var paymentService = serviceProvider.GetService<IPaymentService>();
-            var paymentAmount = paymentService.GetPaymentAmount(customerId, fromDate, toDate);
+            var paymentAmount = paymentService.GetPaymentAmount(searchParameter);
 
             Console.WriteLine(paymentAmount);
 
@@ -48,23 +37,23 @@ namespace TrickBookStore.ConsoleApp
             Console.ReadKey();
         }
 
-        //private Tuple<int, DateTime, DateTime> GetParameter()
-        //{
-        //    Console.WriteLine("Date Format: YYYY-MM-DD");
+        private static PaymentAmountSearchParameter GetSearchParameterParameter()
+        {
+            Console.WriteLine("Date Format: YYYY-MM-DD");
 
-        //    Console.WriteLine("Input Customer Id");
-        //    var customerIdString = Console.ReadLine();
-        //    var customerId = Convert.ToInt32(customerIdString);
+            Console.WriteLine("Input Customer Id");
+            var customerIdString = Console.ReadLine();
+            var customerId = Convert.ToInt32(customerIdString);
 
-        //    Console.WriteLine("Input Date From");
-        //    var fromDateString = Console.ReadLine();
-        //    var fromDate = DateTime.Parse(fromDateString);
+            Console.WriteLine("Input Date From");
+            var fromDateString = Console.ReadLine();
+            var fromDate = DateTime.Parse(fromDateString);
 
-        //    Console.WriteLine("Input Date To");
-        //    var toDateString = Console.ReadLine();
-        //    var toDate = DateTime.Parse(toDateString);
+            Console.WriteLine("Input Date To");
+            var toDateString = Console.ReadLine();
+            var toDate = DateTime.Parse(toDateString);
 
-        //    return Tuple.Create(customerId, fromDate, toDate);
-        //}
+            return new PaymentAmountSearchParameter { CustomerId = customerId, FromDate = fromDate, ToDate = toDate };
+        }
     }
 }

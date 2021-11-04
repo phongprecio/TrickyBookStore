@@ -22,17 +22,19 @@ namespace TrickyBookStore.Services.Books
         public IList<Book> GetBooks(params long[] ids)
         {
             var books = Store.Books.Data.Where(book => ids.Contains(book.Id)).ToList();
-            books.ForEach(book =>
+            var categoryDic = new Dictionary<int, BookCategory>();
+            var categoriyIds = books.Select(book => book.CategoryId).Distinct().ToList();
+            
+            categoriyIds.ForEach(categoryId =>
             {
-                book.Category = BookCategoryServicve.GetBookCategory(book.CategoryId);
+                var bookCategory = BookCategoryServicve.GetBookCategoryById(categoryId);
+                if (bookCategory != null)
+                    categoryDic.Add(categoryId, bookCategory);
             });
+
+            books.ForEach(book => book.Category = categoryDic[book.CategoryId]);
             
             return books;
-        }
-
-        public IList<Book> GetBooksByCategoryId(int categoryId)
-        {
-            return Store.Books.Data.Where(book => categoryId == book.CategoryId).ToList();
         }
     }
 }

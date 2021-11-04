@@ -6,7 +6,6 @@ namespace TrickyBookStore.Services.Books
     public interface IBookService
     {
         IList<Book> GetBooks(params long[] ids);
-        IList<Book> GetBooksByCategoryId(int categoryId);
         Book GetBookById(long id);
     }
 }

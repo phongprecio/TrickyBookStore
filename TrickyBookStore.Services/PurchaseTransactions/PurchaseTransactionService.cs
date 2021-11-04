@@ -15,9 +15,9 @@ namespace TrickyBookStore.Services.PurchaseTransactions
             BookService = bookService;
         }
 
-        public IList<PurchaseTransaction> GetPurchaseTransactions(long customerId, DateTimeOffset fromDate, DateTimeOffset toDate)
+        public IList<PurchaseTransaction> GetPurchaseTransactions(PaymentAmountSearchParameter searchParameter)
         {
-            var purchaseTransactions = Store.PurchaseTransactions.Data.Where(transaction => customerId == transaction.CustomerId && fromDate <= transaction.CreatedDate && toDate >= transaction.CreatedDate).ToList();
+            var purchaseTransactions = Store.PurchaseTransactions.Data.Where(transaction => searchParameter.CustomerId == transaction.CustomerId && searchParameter.FromDate <= transaction.CreatedDate && searchParameter.ToDate >= transaction.CreatedDate).ToList();
             purchaseTransactions.ForEach(transaction =>
             {
                 transaction.Book = BookService.GetBookById(transaction.BookId);

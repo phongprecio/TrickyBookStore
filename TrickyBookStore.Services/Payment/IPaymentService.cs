@@ -1,10 +1,11 @@
 ﻿using System;
+using TrickyBookStore.Models;
 
 // KeepIt
 namespace TrickyBookStore.Services.Payment
 {
     public interface IPaymentService
     {
-        double GetPaymentAmount(long customerId, DateTimeOffset fromDate, DateTimeOffset toDate);
+        double GetPaymentAmount(PaymentAmountSearchParameter searchParameter);
     }
 }
